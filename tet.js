@@ -4,13 +4,16 @@ const DB_PATH = 'sdcard/bot/db/schedule.txt';
 const ORDER_ROOT = '..꽁 ';
 const ORDER_ADD = '추가';
 const ORDER_REMOVE = '삭제';
+const ORDER_TODAY = '오늘';
 const ORDER_SCHEDULE = '일정';
 const ORDER_RESET = '초기화';
 const ORDER_HELP = '기능';
 const SEPARATOR_ADD = '=';
 const INVALID_DATE = '날짜를 제대로 입력해주세요';
+const NON_SCHEDULE = '오늘은 방탈이 없습니다.\n분발하세요 cde!';
 const REGEX_DATE = /^(0[1-9]|1[012])(0[1-9]|[12][0-9]|3[0-1])$/;
 const EXAMPLE_ADD = 'ex)\n..꽁 추가 1009=홍대\n10:30 하이팜\n12:00 거상';
+let gTodayKey = {};
 
 if (!fs.read(DB_PATH)) {
     fs.write(DB_PATH, '{}');
@@ -23,21 +26,38 @@ function updateDb() {
 }
 
 function response(room, msg, sender, isGroupChat, replier) {
-    if (!msg.startsWith(ORDER_ROOT)) {
-        return;
-    }
+    let response = '';
 
     if (db[room] == undefined) {
         db[room] = {};
     }
 
+    if (!msg.startsWith(ORDER_ROOT)) {
+        //그 날 첫 카톡에 반응, 그 날 일정 출력
+        let todayKey = getNowDateStr();
+
+        if (gTodayKey[room] == undefined || todayKey > gTodayKey[room]) {
+            response = checkSchedule(todayKey, room) 
+                ? getSchedule(todayKey, room)
+                : NON_SCHEDULE;
+
+            replier.reply(response);
+            gTodayKey[room] = todayKey;
+        }
+
+        return;
+    }
+
     msg = msg.substr(ORDER_ROOT.length);
-    let response = '';
     let dateKey = addYear(msg);
 
     //단일 일정 조회
-    if (Object.keys(db[room]).includes(dateKey).valueOf()) {
-        response = convertDate(dateKey) + '\n' + db[room][dateKey];
+    if (msg == ORDER_TODAY) {
+        response = checkSchedule(dateKey, room) 
+            ? getSchedule(dateKey, room)
+            : NON_SCHEDULE;
+    } else if (checkSchedule(dateKey, room)) {
+        response = getSchedule(dateKey, room);
     } else if (msg == ORDER_SCHEDULE) {     //전체 일정 조회
         response = all(room);
     } else if (msg == ORDER_RESET) {        //초기화
@@ -46,6 +66,7 @@ function response(room, msg, sender, isGroupChat, replier) {
         response = '초기화 완료';
     } else if (msg == ORDER_HELP) {     // 안내
         response = '[일정 추가하기]\n..꽁 추가 MMDD=[내용]\n' + EXAMPLE_ADD
+            + '\n\n[오늘 일정]]\n..꽁 오늘'
             + '\n\n[일정 삭제하기]\n..꽁 삭제 MMDD'
             + '\n\n[전체 조회하기]\n..꽁 일정'
             + '\n\n[하루 조회하기]\n..꽁 MMDD';
@@ -95,6 +116,14 @@ function addYear(inputDate) {
 
 function convertDate(inputDate) {
     return inputDate.substr(4, 2) + '월 ' + inputDate.substr(6) + '일';
+}
+
+function checkSchedule(dateKey, room) {
+    return Object.keys(db[room]).includes(dateKey).valueOf();
+}
+
+function getSchedule(dateKey, room) {
+    return convertDate(dateKey) + '\n' + db[room][dateKey];
 }
 
 function add(room, msg) {
