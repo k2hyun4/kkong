@@ -33,17 +33,20 @@ function response(room, msg, sender, isGroupChat, replier) {
     }
 
     if (!msg.startsWith(ORDER_ROOT)) {
-        //그 날 첫 카톡에 반응, 그 날 일정 출력
-        let todayKey = getNowDateStr();
+        /**
+         * 그 날 첫 카톡에 반응, 그 날 일정 출력
+         * 실사용 폰과 봇용 폰이 동일하므로 일단 사용 불가
+         */
+        // let todayKey = getNowDateStr();
 
-        if (gTodayKey[room] == undefined || todayKey > gTodayKey[room]) {
-            response = checkSchedule(todayKey, room) 
-                ? getSchedule(todayKey, room)
-                : NON_SCHEDULE;
+        // if (gTodayKey[room] == undefined || todayKey > gTodayKey[room]) {
+        //     response = checkSchedule(todayKey, room) 
+        //         ? getSchedule(todayKey, room)
+        //         : NON_SCHEDULE;
 
-            replier.reply(response);
-            gTodayKey[room] = todayKey;
-        }
+        //     replier.reply(response);
+        //     gTodayKey[room] = todayKey;
+        // }
 
         return;
     }
