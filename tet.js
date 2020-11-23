@@ -7,13 +7,15 @@ const ORDER_REMOVE = '삭제';
 const ORDER_TODAY = '오늘';
 const ORDER_SCHEDULE = '일정';
 const ORDER_RESET = '초기화';
-const ORDER_HELP = '기능';
+const ORDER_HELP = '헬프';
+const ORDER_ADVICE = '도움';
+const ORDER_FUNCTION = '기능';
 const SEPARATOR_ADD = '=';
 const INVALID_DATE = '날짜를 제대로 입력해주세요';
-const NON_SCHEDULE = '오늘은 방탈이 없습니다.\n분발하세요 cde!';
+const NON_SCHEDULE = '예정된 방탈이 없습니다.\n분발하세요 cde!';
 const REGEX_DATE = /^(0[1-9]|1[012])(0[1-9]|[12][0-9]|3[0-1])$/;
 const EXAMPLE_ADD = 'ex)\n..꽁 추가 1009=홍대\n10:30 하이팜\n12:00 거상';
-let gTodayKey = {};
+//let gTodayKey = {};
 
 if (!fs.read(DB_PATH)) {
     fs.write(DB_PATH, '{}');
@@ -52,45 +54,24 @@ function response(room, msg, sender, isGroupChat, replier) {
     }
 
     msg = msg.substr(ORDER_ROOT.length);
-    let dateKey = addYear(msg);
 
-    //단일 일정 조회
-    if (msg == ORDER_TODAY) {
-        response = checkSchedule(dateKey, room) 
-            ? getSchedule(dateKey, room)
-            : NON_SCHEDULE;
-    } else if (checkSchedule(dateKey, room)) {
-        response = getSchedule(dateKey, room);
-    } else if (msg == ORDER_SCHEDULE) {     //전체 일정 조회
+    if (msg === ORDER_SCHEDULE) {
         response = all(room);
-    } else if (msg == ORDER_RESET) {        //초기화
-        db[room] = {};
-        updateDb();
-        response = '초기화 완료';
-    } else if (msg == ORDER_HELP) {     // 안내
-        response = '[일정 추가하기]\n..꽁 추가 MMDD=[내용]\n' + EXAMPLE_ADD
-            + '\n\n[오늘 일정]]\n..꽁 오늘'
-            + '\n\n[일정 삭제하기]\n..꽁 삭제 MMDD'
-            + '\n\n[전체 조회하기]\n..꽁 일정'
-            + '\n\n[하루 조회하기]\n..꽁 MMDD';
-    } else {
-        const orderSepatatorIndex = msg.indexOf(' ');
-
-        if (orderSepatatorIndex < 0) {
+    } else if (msg === ORDER_HELP || msg === ORDER_ADVICE || msg === ORDER_FUNCTION) {
+        response = help();
+    } else if (msg === ORDER_RESET) {
+        response = reset(room);
+    } else if (msg.startsWith(ORDER_ADD)) {
+        response = add(room, msg);
+    } else if (msg.startsWith(ORDER_RESET)) {
+        response = remove(room, msg);
+    } else {        //특정일 or 오늘 일정
+        if (msg != ORDER_TODAY && !REGEX_DATE.test(msg)) {
             return;
-        } else {
-            const checker = msg.substr(0, orderSepatatorIndex);
-            msg = msg.substr(orderSepatatorIndex + 1);
-        
-            switch (checker) {
-                case ORDER_ADD: 
-                    response = add(room, msg);
-                    break;
-                case ORDER_REMOVE:
-                    response = remove(room, msg);
-                    break;
-            }
         }
+        
+        const dateKey = msg === ORDER_TODAY ? getNowDateStr() : addYear(msg);
+        response = checkSchedule(dateKey, room);
     }
 
     replier.reply(response);
@@ -122,18 +103,43 @@ function convertDate(inputDate) {
 }
 
 function checkSchedule(dateKey, room) {
-    return Object.keys(db[room]).includes(dateKey).valueOf();
+    const hasSchedule = Object.keys(db[room])
+        .includes(dateKey)
+        .valueOf();
+
+    return hasSchedule ? getSchedule(dateKey, room) : NON_SCHEDULE;
 }
 
 function getSchedule(dateKey, room) {
     return convertDate(dateKey) + '\n' + db[room][dateKey];
 }
 
+function help() {
+    return '[일정 추가하기]\n..꽁 추가 MMDD=[내용]\n' + EXAMPLE_ADD
+            + '\n\n[오늘 일정]]\n..꽁 오늘'
+            + '\n\n[일정 삭제하기]\n..꽁 삭제 MMDD'
+            + '\n\n[전체 조회하기]\n..꽁 일정'
+            + '\n\n[하루 조회하기]\n..꽁 MMDD';
+}
+
+function getAddRemoveDateKey(msg) {
+    const orderSepatatorIndex = msg.indexOf(' ');
+
+    return orderSepatatorIndex < 0 ? false : msg.substr(orderSepatatorIndex + 1);
+}
+
 function add(room, msg) {
-    const msgs = msg.split(SEPARATOR_ADD);
+    const dateKey = getAddRemoveDateKey(msg);
+    const errorMsg = '날짜=내용 형식으로 입력해주세요. ' + EXAMPLE_ADD;
+
+    if (dateKey == false) {
+        return errorMsg;
+    }
+
+    const msgs = dateKey.split(SEPARATOR_ADD);
 
     if (msgs.length != 2) {
-        return '날짜=내용 형식으로 입력해주세요. ' + EXAMPLE_ADD;
+        return errorMsg;
     }
 
     const inputDate = msgs[0];
@@ -149,14 +155,29 @@ function add(room, msg) {
 }
 
 function remove(room, msg) {
-    if (!REGEX_DATE.test(msg)) {
+    const dateKey = getAddRemoveDateKey(msg);
+    
+    if (dateKey == false) {
+        return '삭제 실패';
+    }
+
+    if (!REGEX_DATE.test(dateKey)) {
         return INVALID_DATE;
     }
 
-    delete db[room][addYear(msg)];
+    delete db[room][addYear(dateKey)];
     updateDb();
 
-    return msg + ' 삭제 완료';
+    return dateKey + ' 삭제 완료';
+}
+
+function reset(room) {
+    /**
+     * 현재 불필요, 기능 막아둠
+     */
+    // db[room] = {};
+    // updateDb();
+    // response = '초기화 완료';
 }
 
 /**
